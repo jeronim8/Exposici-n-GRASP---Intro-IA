@@ -14,3 +14,4 @@ convergencia_grasp.png
 .env
 .venv
 venv/
+.claude
