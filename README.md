@@ -27,9 +27,9 @@ python grasp_nqueens.py --n 100 --alpha 0.2 --iteraciones 30 --semilla 42
 ```
 
 Banderas disponibles: `--n`, `--alpha`, `--iteraciones`, `--semilla`,
-`--vecindario` (`aleatorio` o `completo`), `--todas` (no detenerse al
-encontrar costo 0) y `--sin-grafica`. Los parámetros también se pueden
-editar directamente en el bloque `PARÁMETROS` al inicio del script.
+`--todas` (no detenerse al encontrar costo 0) y `--sin-grafica`. Los
+parámetros también se pueden editar directamente en el bloque `PARÁMETROS`
+al inicio del script.
 
 ## Salida
 
@@ -39,24 +39,28 @@ editar directamente en el bloque `PARÁMETROS` al inicio del script.
   series: costo tras la fase constructiva, costo tras la búsqueda local y
   mejor costo global acumulado
 
-## Las dos estrategias de búsqueda local
+## Cómo funciona
 
-El script incluye dos operadores de mejora, seleccionables con `--vecindario`:
+1. **Fase constructiva** (`construct_greedy_randomized`): arma el tablero
+   columna por columna. Para cada columna evalúa cuántos ataques diagonales
+   generaría cada fila libre, se queda con las mejores en la RCL según el
+   umbral `min + alpha * (max - min)` y elige una al azar.
+2. **Búsqueda local** (`local_search`): sobre la solución construida hace
+   swaps entre dos posiciones aleatorias y acepta el intercambio solo si baja
+   el costo, hasta llegar a costo 0 o a un óptimo local.
+3. **Ciclo principal** (`grasp`): repite las dos fases y se queda con la
+   mejor solución de todas las iteraciones.
 
-- **`aleatorio`** (por defecto): swap entre dos posiciones al azar, se acepta
-  solo si baja el costo (primera mejora). Es el operador base del enunciado.
-- **`completo`**: revisa los N(N-1)/2 swaps posibles y se mueve al mejor
-  (mejor mejora). Llega a soluciones igual de buenas, pero cada paso evalúa
-  todo el vecindario, así que escala peor.
+## Escalabilidad
 
 Tiempos medidos hasta llegar a costo 0 (semilla 42, alpha 0.3 salvo N=100
-que usa 0.2). Los dos alcanzan costo 0 en todos los tamaños:
+que usa 0.2):
 
-| N   | vecindario aleatorio | vecindario completo |
-|-----|----------------------|---------------------|
-| 8   | < 0.001 s            | < 0.001 s           |
-| 50  | 0.004 s              | 0.084 s             |
-| 100 | 0.142 s              | 0.609 s             |
+| N   | tiempo    | iteraciones |
+|-----|-----------|-------------|
+| 8   | < 0.001 s | 1           |
+| 50  | 0.005 s   | 1           |
+| 100 | 0.141 s   | 2           |
 
 ## Nota para la gráfica
 

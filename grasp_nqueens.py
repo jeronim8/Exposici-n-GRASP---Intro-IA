@@ -30,7 +30,6 @@ N = 8                     # Número de reinas / tamaño del tablero
 GRASP_ITERATIONS = 30     # Número de veces que se repite construcción + mejora
 ALPHA = 0.3                # Umbral de calidad para la RCL (0 = greedy puro, 1 = aleatorio puro)
 MAX_NO_IMPROVE = 2000      # Intentos de swap seguidos sin mejora antes de declarar óptimo local
-NEIGHBORHOOD = "aleatorio"  # "aleatorio" (swap entre dos posiciones al azar) o "completo"
 SEED = None                 # Fijar un entero aquí (ej. 42) para resultados reproducibles
 PLOT_FILE = "convergencia_grasp.png"
 MAX_BOARD_PRINT = 20        # Si N es mayor que esto, solo se imprime el vector
@@ -131,7 +130,7 @@ def construct_greedy_randomized(n, alpha):
 # ============================================================
 # FASE DE BÚSQUEDA LOCAL (mejora con operador de swap)
 # ============================================================
-def local_search_random_swap(state, max_no_improve=MAX_NO_IMPROVE):
+def local_search(state, max_no_improve=MAX_NO_IMPROVE):
     """
     Búsqueda local con el operador base del enunciado: swap entre dos
     posiciones ALEATORIAS del vector.
@@ -166,55 +165,10 @@ def local_search_random_swap(state, max_no_improve=MAX_NO_IMPROVE):
     return current, current_cost
 
 
-def local_search_full_neighborhood(state, max_iterations=200):
-    """
-    Variante de búsqueda local: en vez de swaps al azar, revisa TODOS los
-    vecinos posibles (los N*(N-1)/2 swaps) y se mueve al mejor de ellos
-    (hill climbing de mejor mejora), hasta que ningún vecino mejore.
-
-    Encuentra soluciones igual de buenas, pero cada paso revisa N(N-1)/2
-    vecinos, así que escala peor: en N=100 tarda ~0.6 s frente a ~0.14 s de
-    la versión aleatoria. Se deja implementada para poder comparar las dos
-    estrategias con la bandera --vecindario.
-    """
-    current = state.copy()
-    current_cost = cost(current)
-    n = len(current)
-
-    for _ in range(max_iterations):
-        best_neighbor = None
-        best_neighbor_cost = current_cost
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                neighbor = current.copy()
-                neighbor[i], neighbor[j] = neighbor[j], neighbor[i]
-                neighbor_cost = cost(neighbor)
-                if neighbor_cost < best_neighbor_cost:
-                    best_neighbor_cost = neighbor_cost
-                    best_neighbor = neighbor
-
-        # Si ningún vecino mejora, hemos alcanzado un óptimo local.
-        if best_neighbor is None:
-            break
-
-        current = best_neighbor
-        current_cost = best_neighbor_cost
-
-    return current, current_cost
-
-
-def local_search(state, neighborhood=NEIGHBORHOOD):
-    """Despacha a la estrategia de búsqueda local elegida."""
-    if neighborhood == "completo":
-        return local_search_full_neighborhood(state)
-    return local_search_random_swap(state)
-
-
 # ============================================================
 # CICLO PRINCIPAL DE GRASP
 # ============================================================
-def grasp(n, iterations, alpha=ALPHA, neighborhood=NEIGHBORHOOD, stop_at_zero=True):
+def grasp(n, iterations, alpha=ALPHA, stop_at_zero=True):
     """
     Ejecuta el ciclo completo de GRASP:
     repetir (construcción + búsqueda local) 'iterations' veces,
@@ -243,7 +197,7 @@ def grasp(n, iterations, alpha=ALPHA, neighborhood=NEIGHBORHOOD, stop_at_zero=Tr
         construction_cost = cost(candidate)
 
         # Fase 2: búsqueda local sobre lo construido.
-        candidate, candidate_cost = local_search(candidate, neighborhood)
+        candidate, candidate_cost = local_search(candidate)
 
         if candidate_cost < best_cost:
             best_cost = candidate_cost
@@ -328,8 +282,6 @@ def main():
                         help=f"iteraciones de GRASP (default {GRASP_ITERATIONS})")
     parser.add_argument("--semilla", type=int, default=SEED,
                         help="semilla aleatoria para reproducir resultados")
-    parser.add_argument("--vecindario", choices=["aleatorio", "completo"], default=NEIGHBORHOOD,
-                        help="estrategia de búsqueda local (default aleatorio)")
     parser.add_argument("--todas", action="store_true",
                         help="ejecutar todas las iteraciones aunque ya se encuentre costo 0 "
                              "(útil para que la gráfica de convergencia sea más ilustrativa)")
@@ -351,7 +303,7 @@ def main():
 
     print("=" * 60)
     print(f"Ejecutando GRASP para N={args.n} con {args.iteraciones} iteraciones")
-    print(f"alpha = {args.alpha} | búsqueda local = {args.vecindario}")
+    print(f"alpha = {args.alpha}")
     print("=" * 60)
 
     # Caso conocido del problema: para N=2 y N=3 no existe ninguna solución
@@ -362,7 +314,7 @@ def main():
 
     start_time = time.perf_counter()
     best_state, best_cost, history = grasp(args.n, args.iteraciones, args.alpha,
-                                           args.vecindario, stop_at_zero=not args.todas)
+                                           stop_at_zero=not args.todas)
     elapsed_time = time.perf_counter() - start_time
 
     print("\n" + "-" * 60)
