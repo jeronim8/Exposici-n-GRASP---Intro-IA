@@ -6,33 +6,38 @@ Taller Investigativo - Introducción a la Inteligencia Artificial
 Algoritmo asignado: GRASP
 
 Representación del estado: vector de tamaño N, donde el índice es la
-columna y el valor es la fila (ej. [2, 0, 3, 1]).
+columna y el valor es la fila (ej. [2, 0, 3, 1]). Como cada columna
+aparece una sola vez y el vector se mantiene como permutación (sin
+valores repetidos), quedan descartados por construcción los ataques en
+filas y en columnas: solo hay que revisar las diagonales.
+
 Función de costo: número total de ataques en las diagonales (óptimo = 0).
 
 Uso:
-    python grasp_nqueens.py                    # caso base con los parámetros de abajo
-    python grasp_nqueens.py --n 50             # cambiar N por línea de comandos
-    python grasp_nqueens.py --n 100 --alpha 0.2 --iteraciones 30
+    python grasp_nqueens.py        # caso base, N = 8
+    python grasp_nqueens.py 50     # recibe N como parámetro
+    python grasp_nqueens.py 100
 """
 
 import argparse
 import random
 import time
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 
 
 # ============================================================
 # PARÁMETROS (declarados aquí para facilitar la experimentación)
-# También se pueden sobrescribir por línea de comandos.
 # ============================================================
-N = 8                     # Número de reinas / tamaño del tablero
-GRASP_ITERATIONS = 30     # Número de veces que se repite construcción + mejora
-ALPHA = 0.3                # Umbral de calidad para la RCL (0 = greedy puro, 1 = aleatorio puro)
+N = 8                      # Número de reinas / tamaño del tablero
+ALPHA = 0.5                # Umbral de calidad para la RCL (0 = greedy puro, 1 = aleatorio puro)
+GRASP_ITERATIONS = 30      # Número de veces que se repite construcción + búsqueda local
 MAX_NO_IMPROVE = 2000      # Intentos de swap seguidos sin mejora antes de declarar óptimo local
-SEED = None                 # Fijar un entero aquí (ej. 42) para resultados reproducibles
+STOP_AT_ZERO = False       # True: cortar apenas se encuentre costo 0
+SEED = None                # None = cada ejecución da un resultado distinto.
+                           # Con un entero fijo (ej. 7) siempre sale lo mismo,
+                           # útil para repetir una corrida durante la sustentación.
 PLOT_FILE = "convergencia_grasp.png"
-MAX_BOARD_PRINT = 20        # Si N es mayor que esto, solo se imprime el vector
+MAX_BOARD_PRINT = 20       # Si N es mayor que esto, se imprime solo el vector solución
 
 
 # ============================================================
@@ -70,59 +75,60 @@ def cost(state):
 # ============================================================
 # FASE CONSTRUCTIVA (Greedy Randomizada)
 # ============================================================
+def diagonal_attacks_for_row(partial_state, col, row):
+    """
+    Cuenta cuántos ataques diagonales generaría colocar una reina en
+    (row, col) contra las reinas YA colocadas en partial_state
+    (columnas 0 .. col-1).
+
+    Dos reinas están en la misma diagonal cuando la distancia horizontal
+    entre ellas es igual a la distancia vertical.
+    """
+    attacks = 0
+    for c in range(col):
+        if abs(row - partial_state[c]) == abs(col - c):
+            attacks += 1
+    return attacks
+
+
 def construct_greedy_randomized(n, alpha):
     """
     Construye una solución columna por columna usando una Lista
     Restringida de Candidatos (RCL).
 
-    Pasos (según el enunciado):
-    1. Empezar con un vector vacío / lista de filas disponibles = [0..n-1].
-    2. Para cada columna (de 0 a n-1):
-        a. Para cada fila disponible, calcular cuántos ataques diagonales
-           generaría contra las reinas ya colocadas.
-        b. Armar la RCL con las mejores filas (menor número de ataques),
-           usando el umbral   min + alpha * (max - min).
-        c. Elegir aleatoriamente una fila dentro de la RCL.
-        d. Colocarla en esa columna y quitarla de las filas disponibles
-           (para no repetir fila, ya que el vector no puede tener valores
-           repetidos).
-    3. Devolver el vector completo de tamaño n.
+    Para cada columna:
+    1. Se calcula, para cada fila todavía disponible, cuántos ataques
+       diagonales generaría contra las reinas ya colocadas.
+    2. Se arma la RCL con las filas cuyo costo no supera el umbral
+       min + alpha * (max - min).
+    3. Se elige una fila al azar dentro de la RCL y se quita de las
+       disponibles (para no repetir fila).
 
     Con alpha = 0 el umbral es el mínimo, o sea greedy puro; con alpha = 1
     entran todas las filas libres, o sea aleatorio puro. Los valores
-    intermedios dan la aleatoriedad controlada propia de GRASP.
-
-    Para saber cuántos ataques genera una fila candidata NO recorremos las
-    columnas ya colocadas: llevamos contadores de cuántas reinas hay en
-    cada diagonal, así la evaluación de cada candidato es O(1).
+    intermedios dan la aleatoriedad controlada propia de GRASP: cada
+    ejecución construye una solución distinta sin perder el criterio goloso.
     """
     state = []
     available_rows = list(range(n))
 
-    # Los índices se desplazan en n - 1 para que nunca sean negativos.
-    occupied_d1 = [0] * (2 * n - 1)  # col - fila + (n - 1)
-    occupied_d2 = [0] * (2 * n - 1)  # col + fila
-
     for col in range(n):
         # Ataques diagonales que generaría cada fila disponible.
-        attacks_per_row = [occupied_d1[col - row + n - 1] + occupied_d2[col + row]
-                           for row in available_rows]
+        candidates = [
+            (row, diagonal_attacks_for_row(state, col, row))
+            for row in available_rows
+        ]
 
-        min_attacks = min(attacks_per_row)
-        max_attacks = max(attacks_per_row)
+        min_attacks = min(attacks for _, attacks in candidates)
+        max_attacks = max(attacks for _, attacks in candidates)
 
-        # Construir RCL: filas cuyo costo está dentro del umbral alpha.
+        # RCL: las filas suficientemente buenas en este paso.
         threshold = min_attacks + alpha * (max_attacks - min_attacks)
-        rcl = [row for row, attacks in zip(available_rows, attacks_per_row)
-               if attacks <= threshold]
+        rcl = [row for row, attacks in candidates if attacks <= threshold]
 
-        # Elegir aleatoriamente una fila de la RCL.
         chosen_row = random.choice(rcl)
         state.append(chosen_row)
         available_rows.remove(chosen_row)
-
-        occupied_d1[col - chosen_row + n - 1] += 1
-        occupied_d2[col + chosen_row] += 1
 
     return state
 
@@ -130,16 +136,16 @@ def construct_greedy_randomized(n, alpha):
 # ============================================================
 # FASE DE BÚSQUEDA LOCAL (mejora con operador de swap)
 # ============================================================
-def local_search(state, max_no_improve=MAX_NO_IMPROVE):
+def local_search(state):
     """
-    Búsqueda local con el operador base del enunciado: swap entre dos
-    posiciones ALEATORIAS del vector.
+    Mejora la solución construida con swaps entre dos posiciones
+    aleatorias del vector.
 
-    Estrategia hill climbing de primera mejora: se eligen dos columnas al
-    azar, se intercambian sus filas y el movimiento se acepta solo si el
-    costo baja; si no, se deshace. Se detiene al llegar a costo 0 o tras
-    max_no_improve intentos seguidos sin mejora, lo que se interpreta como
-    haber llegado a un óptimo local.
+    Estrategia hill climbing: se eligen dos columnas al azar, se
+    intercambian sus filas y el movimiento se acepta solo si el costo
+    baja; si no, se deshace. Se detiene al llegar a costo 0 o tras
+    MAX_NO_IMPROVE intentos seguidos sin mejora, que es la señal de haber
+    llegado a un óptimo local.
 
     El swap es el operador natural aquí porque conserva la permutación:
     nunca repite una fila y por lo tanto nunca introduce ataques de fila.
@@ -149,7 +155,7 @@ def local_search(state, max_no_improve=MAX_NO_IMPROVE):
     n = len(current)
     failures = 0
 
-    while current_cost > 0 and failures < max_no_improve:
+    while current_cost > 0 and failures < MAX_NO_IMPROVE:
         i, j = random.sample(range(n), 2)
 
         current[i], current[j] = current[j], current[i]
@@ -168,11 +174,10 @@ def local_search(state, max_no_improve=MAX_NO_IMPROVE):
 # ============================================================
 # CICLO PRINCIPAL DE GRASP
 # ============================================================
-def grasp(n, iterations, alpha=ALPHA, stop_at_zero=True):
+def grasp(n, alpha, iterations):
     """
-    Ejecuta el ciclo completo de GRASP:
-    repetir (construcción + búsqueda local) 'iterations' veces,
-    guardando siempre la mejor solución encontrada.
+    Ejecuta el ciclo completo de GRASP: repetir (construcción + búsqueda
+    local) 'iterations' veces, guardando siempre la mejor solución global.
 
     Lo que distingue a GRASP de Hill Climbing o Simulated Annealing es que
     cada iteración arranca de una solución NUEVA generada por la fase
@@ -182,53 +187,44 @@ def grasp(n, iterations, alpha=ALPHA, stop_at_zero=True):
     Devuelve:
     - best_state: mejor vector solución encontrado
     - best_cost: su costo (ataques diagonales)
-    - history: diccionario con tres listas por iteración
-        "construction" -> costo con el que salió la fase constructiva
-        "iteration"    -> costo después de la búsqueda local
-        "best"         -> mejor costo global acumulado (curva de convergencia)
+    - history: mejor costo alcanzado hasta cada iteración (para graficar
+      la convergencia)
+    - elapsed: tiempo de ejecución en segundos
     """
+    start_time = time.perf_counter()
+
     best_state = None
     best_cost = float("inf")
-    history = {"construction": [], "iteration": [], "best": []}
+    history = []
 
-    for it in range(1, iterations + 1):
-        # Fase 1: construcción greedy randomizada.
+    for _ in range(iterations):
         candidate = construct_greedy_randomized(n, alpha)
-        construction_cost = cost(candidate)
-
-        # Fase 2: búsqueda local sobre lo construido.
         candidate, candidate_cost = local_search(candidate)
 
         if candidate_cost < best_cost:
             best_cost = candidate_cost
             best_state = candidate
 
-        history["construction"].append(construction_cost)
-        history["iteration"].append(candidate_cost)
-        history["best"].append(best_cost)
+        history.append(best_cost)
 
-        print(f"  iteración {it:3d}/{iterations}  construcción = {construction_cost:4d}"
-              f"   tras búsqueda local = {candidate_cost:4d}"
-              f"   mejor global = {best_cost:4d}")
-
-        # Corte anticipado: ya encontramos una solución óptima.
-        if best_cost == 0 and stop_at_zero:
-            print("  -> se encontró una solución óptima, se detiene el ciclo")
+        if best_cost == 0 and STOP_AT_ZERO:
             break
 
-    return best_state, best_cost, history
+    elapsed = time.perf_counter() - start_time
+    return best_state, best_cost, history, elapsed
 
 
 # ============================================================
 # VISUALIZACIÓN Y MÉTRICAS
 # ============================================================
 def print_board(state):
-    """Imprime el tablero en consola usando el vector solución."""
+    """Imprime el vector solución y, si N es pequeño, dibuja el tablero."""
     n = len(state)
-    print(f"\nVector solución: {state}")
+    print(f"\nVector solución: {state}\n")
+
     if n > MAX_BOARD_PRINT:
-        print(f"(tablero omitido por tamaño N={n}; se muestra solo el vector)\n")
         return
+
     for row in range(n):
         line = ""
         for col in range(n):
@@ -237,35 +233,19 @@ def print_board(state):
     print()
 
 
-def plot_convergence(history, n, alpha, filename=PLOT_FILE):
+def plot_convergence(history, n):
     """
-    Grafica cómo disminuyó el mejor costo encontrado por iteración.
-
-    Se dibujan tres series para poder explicar el aporte de cada fase de
-    GRASP: con qué costo sale la construcción, en cuánto lo deja la
-    búsqueda local y cómo evoluciona el mejor costo global.
+    Grafica cómo disminuyó el costo de la mejor solución iteración tras
+    iteración. Guarda la imagen y la muestra en pantalla.
     """
-    iterations = range(1, len(history["best"]) + 1)
-
-    plt.figure(figsize=(9, 5))
-    plt.plot(iterations, history["construction"], marker="^", linestyle=":",
-             color="tab:green", alpha=0.7, label="Tras fase constructiva (RCL)")
-    plt.plot(iterations, history["iteration"], marker="o", linestyle="--",
-             color="tab:orange", alpha=0.7, label="Tras búsqueda local")
-    plt.plot(iterations, history["best"], marker="s", color="tab:blue",
-             label="Mejor costo global (convergencia)")
+    plt.figure()
+    plt.plot(range(1, len(history) + 1), history, marker="o")
     plt.xlabel("Iteración GRASP")
-    plt.ylabel("Costo (ataques diagonales)")
-    plt.title(f"Convergencia de GRASP - N-Reinas (N={n}, alpha={alpha})")
-    # Iteraciones y costos son números enteros, evitamos marcas con decimales.
-    axes = plt.gca()
-    axes.xaxis.set_major_locator(MaxNLocator(integer=True))
-    axes.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.grid(True, linestyle=":", alpha=0.6)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(filename, dpi=150)
-    print(f"\nGráfica guardada en: {filename}")
+    plt.ylabel("Mejor costo encontrado (ataques diagonales)")
+    plt.title(f"Convergencia de GRASP (N={n})")
+    plt.grid(True)
+    plt.savefig(PLOT_FILE)
+    print(f"Gráfica guardada en: {PLOT_FILE}")
     plt.show()
 
 
@@ -274,63 +254,27 @@ def plot_convergence(history, n, alpha, filename=PLOT_FILE):
 # ============================================================
 def main():
     parser = argparse.ArgumentParser(description="GRASP para el problema de las N-Reinas")
-    parser.add_argument("--n", type=int, default=N,
-                        help=f"tamaño del tablero (default {N})")
-    parser.add_argument("--alpha", type=float, default=ALPHA,
-                        help=f"tamaño relativo de la RCL, 0=greedy 1=aleatorio (default {ALPHA})")
-    parser.add_argument("--iteraciones", type=int, default=GRASP_ITERATIONS,
-                        help=f"iteraciones de GRASP (default {GRASP_ITERATIONS})")
-    parser.add_argument("--semilla", type=int, default=SEED,
-                        help="semilla aleatoria para reproducir resultados")
-    parser.add_argument("--todas", action="store_true",
-                        help="ejecutar todas las iteraciones aunque ya se encuentre costo 0 "
-                             "(útil para que la gráfica de convergencia sea más ilustrativa)")
-    parser.add_argument("--sin-grafica", action="store_true",
-                        help="no generar la gráfica de convergencia")
+    parser.add_argument("n", nargs="?", type=int, default=N,
+                        help=f"tamaño del tablero (por defecto {N})")
     args = parser.parse_args()
 
-    # Validación de los parámetros: con alpha fuera de [0, 1] el umbral de la
-    # RCL deja de tener sentido (y con alpha negativo la RCL queda vacía).
     if args.n < 1:
         parser.error("N debe ser un entero positivo")
-    if not 0.0 <= args.alpha <= 1.0:
-        parser.error("alpha debe estar entre 0 y 1")
-    if args.iteraciones < 1:
-        parser.error("el número de iteraciones debe ser al menos 1")
 
-    if args.semilla is not None:
-        random.seed(args.semilla)
+    if SEED is not None:
+        random.seed(SEED)
 
-    print("=" * 60)
-    print(f"Ejecutando GRASP para N={args.n} con {args.iteraciones} iteraciones")
-    print(f"alpha = {args.alpha}")
-    print("=" * 60)
+    print(f"Ejecutando GRASP para N={args.n} con {GRASP_ITERATIONS} iteraciones "
+          f"y alpha={ALPHA}...")
 
-    # Caso conocido del problema: para N=2 y N=3 no existe ninguna solución
-    # sin ataques, así que el costo nunca podrá llegar a 0.
-    if args.n in (2, 3):
-        print(f"Aviso: para N={args.n} el problema no tiene solución, "
-              f"el costo mínimo alcanzable es mayor que 0.\n")
+    best_state, best_cost, history, elapsed = grasp(args.n, ALPHA, GRASP_ITERATIONS)
 
-    start_time = time.perf_counter()
-    best_state, best_cost, history = grasp(args.n, args.iteraciones, args.alpha,
-                                           stop_at_zero=not args.todas)
-    elapsed_time = time.perf_counter() - start_time
-
-    print("\n" + "-" * 60)
-    print("RESULTADOS")
-    print("-" * 60)
     print_board(best_state)
     print(f"Costo final (ataques diagonales): {best_cost}")
-    print(f"Tiempo de ejecución: {elapsed_time:.4f} segundos")
-    print(f"Iteraciones realizadas: {len(history['best'])}")
-    if best_cost == 0:
-        print("Estado: solución ÓPTIMA encontrada")
-    else:
-        print("Estado: no se alcanzó el óptimo, la mejor solución aún tiene ataques")
+    print(f"Tiempo de ejecución: {elapsed:.4f} segundos")
+    print(f"Iteraciones realizadas: {len(history)}")
 
-    if not args.sin_grafica:
-        plot_convergence(history, args.n, args.alpha)
+    plot_convergence(history, args.n)
 
 
 if __name__ == "__main__":
