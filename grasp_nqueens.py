@@ -182,8 +182,8 @@ def construct_greedy_randomized(n, alpha):
 # introduce ataques de fila.
 # ================================================================
 
-def local_search(state):
-    
+def local_search(state, max_swaps=MAX_NEIGHBOR_EV):
+
     current = state.copy()
     current_cost = cost(current)
     n = len(current)
@@ -198,7 +198,7 @@ def local_search(state):
 
         random.shuffle(swaps)
 
-        limit = min(len(swaps), MAX_NEIGHBOR_EV) #se elige entre un máximo de iteraciones definido por nosotros y el número total posible de swaps, para mejorar la eficiencia del código.
+        limit = min(len(swaps), max_swaps) #se elige entre un máximo de iteraciones definido por nosotros y el número total posible de swaps, para mejorar la eficiencia del código.
         improved = False
 
         for i, j in swaps[:limit]:
@@ -209,7 +209,7 @@ def local_search(state):
                 current_cost = neighbor_cost   #nos quedamos con el vecino
                 improved = True
                 break
-        
+
             current[i], current[j] = current[j], current[i]  # deshacer el swap
 
         if not improved:

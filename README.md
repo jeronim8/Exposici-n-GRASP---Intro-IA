@@ -47,3 +47,28 @@ Con alpha = 0.5 y 30 iteraciones, los tres tamaños llegan a costo 0:
 | 8   | 0.13 s  |
 | 50  | 1.35 s  |
 | 100 | 4.02 s  |
+
+## Benchmark estadístico
+
+`benchmark_grasp.py` ejecuta múltiples corridas de GRASP para cada tamaño
+de tablero y reporta promedios:
+
+| N   | Tasa de éxito (%) | Iteraciones hasta óptimo | Conflictos tras construcción | Tiempo (s) |
+|-----|-------------------|--------------------------|------------------------------|------------|
+| 8   | 100.0             | 2.25                     | 1.48                         | 0.0070     |
+| 50  | 100.0             | 2.35                     | 3.72                         | 0.8552     |
+| 100 | 100.0             | 2.30                     | 4.55                         | 3.6146     |
+
+Parámetros: alpha=0.3, 30 iteraciones GRASP, 20 corridas por N, semilla=42.
+
+### Uso
+
+```bash
+python benchmark_grasp.py                               # configuración por defecto (N=8,50,100; 20 corridas)
+python benchmark_grasp.py --n 8,50,100 --runs 20
+python benchmark_grasp.py --alpha 0.3 --iterations 30 --seed 42
+python benchmark_grasp.py --n 8 --runs 50 --output results.csv    # también exporta CSV
+```
+
+Los parámetros por defecto también se pueden editar directamente en el bloque
+`PARÁMETROS CONFIGURABLES` al inicio del script.
