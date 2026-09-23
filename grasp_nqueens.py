@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 # PARÁMETROS (declarados aquí para facilitar la experimentación)
 # ============================================================
 N = 8                      # Número de reinas / tamaño del tablero
-ALPHA = 0.5                # Umbral de calidad para la RCL (0 = greedy puro, 1 = aleatorio puro)
+ALPHA = 0.3                # Umbral de calidad para la RCL (0 = greedy puro, 1 = aleatorio puro)
 GRASP_ITERATIONS = 30      # Número de veces que se repite construcción + búsqueda local
 MAX_NO_IMPROVE = 2000      # Intentos de swap seguidos sin mejora antes de declarar óptimo local
 STOP_AT_ZERO = False       # True: cortar apenas se encuentre costo 0
