@@ -182,7 +182,7 @@ def construct_greedy_randomized(n, alpha):
 # introduce ataques de fila.
 # ================================================================
 
-def local_search(state, max_swaps=MAX_NEIGHBOR_EV):
+def local_search(state, max_swaps = MAX_NEIGHBOR_EV):
 
     current = state.copy()
     current_cost = cost(current)
@@ -378,10 +378,7 @@ def print_board(state):
 # ================================================================
 
 def plot_convergence(history, n):
-    """
-    Grafica cómo disminuyó el costo de la mejor solución iteración tras
-    iteración. Guarda la imagen y la muestra en pantalla.
-    """
+    
     plt.figure()
     plt.plot(range(1, len(history) + 1), history, marker="o")
     plt.xlabel("Iteración GRASP")

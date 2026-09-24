@@ -1,8 +1,9 @@
 """
 Benchmark para GRASP en el problema de las N-Reinas.
 
-Ejecuta múltiples corridas de GRASP para diferentes tamaños de tablero
-y recopila estadísticas:
+Ejecuta múltiples corridas de GRASP, a partir de las funciones ya
+elaboradas en el archivo grasp_nqueens, para diferentes tamaños de
+tablero y recopila estadísticas:
 
   - Tasa de éxito: porcentaje de corridas que alcanzaron costo 0.
   - Iteraciones hasta el óptimo: número promedio de iteraciones GRASP
@@ -42,7 +43,7 @@ from grasp_nqueens import (
 # PARÁMETROS CONFIGURABLES
 
 # Declarados aquí para facilitar la experimentación.
-# También pueden sobreponerse desde la línea de comandos.
+# También pueden sobreescribirse desde la línea de comandos.
 # ================================================================
 
 N_VALUES = [8, 50, 100]          # Tamaños de tablero a evaluar
@@ -59,7 +60,8 @@ SEED = None                      # None = aleatorio por corrida; entero = reprod
 # Parametro(s):
 #   n: número de reinas.
 #   alpha: nivel de aleatoriedad de la RCL.
-#   iterations: número de repeticiones de construcción + búsqueda local.
+#   iterations: número de repeticiones de construcción + búsqueda local,
+#   al interior de cada GRASP.
 #   max_neighbor_swap: límite de swaps evaluados en local_search.
 
 # Retorno(s): diccionario con las siguientes claves:
@@ -80,10 +82,10 @@ SEED = None                      # None = aleatorio por corrida; entero = reprod
 
 def grasp_single_run(n, alpha, iterations, max_neighbor_swap):
 
-    start_time = time.perf_counter()
+    start_time = time.perf_counter() #Contador para el tiempo de ejecución.
 
-    best_state = None
-    best_cost = float("inf")
+    best_state = None #Mejor solución
+    best_cost = float("inf") #Mejor costo, inicialmente infinito para seleccionar la primera solución identificada.
     construction_costs = []
     iterations_to_optimal = None
 
@@ -97,9 +99,9 @@ def grasp_single_run(n, alpha, iterations, max_neighbor_swap):
 
         if candidate_cost < best_cost:
             best_cost = candidate_cost
-            best_state = candidate
+            best_state = candidate #Se reemplaza la solución, y su costo, siempre que se identifique una mejor alternativa en la búsqueda local.
 
-        # Registrar cuándo se alcanzó el óptimo por primera vez
+        #Registrar cuándo se alcanzó el óptimo por primera vez
         if best_cost == 0 and iterations_to_optimal is None:
             iterations_to_optimal = it + 1
 
@@ -138,27 +140,27 @@ def run_experiment(n, runs, alpha, grasp_iterations, max_neighbor_swap, seed):
     print(f"\n{'=' * 70}")
     print(f"  N = {n}   |   Corridas: {runs}   |   Alpha: {alpha}   "
           f"|   GRASP iter: {grasp_iterations}")
-    print(f"{'=' * 70}")
+    print(f"{'=' * 70}") #Impresión de los parámetros del experimento.
 
     results = []
 
     for run in range(runs):
         run_seed = None
         if seed is not None:
-            run_seed = seed + run
+            run_seed = seed + run #Si el usuario definió una semilla, se procura que, para cada GRASP sea distinto, de modo que los resultados sean diferentes, pero el proceso sea reproducible.
             random.seed(run_seed)
 
         result = grasp_single_run(n, alpha, grasp_iterations, max_neighbor_swap)
-        results.append(result)
+        results.append(result) #Se realizan los GRASP y se almacenan sus resultados.
 
         status = "[OK] optimo" if result["success"] else "[--] suboptimo"
         print(f"  Corrida {run + 1:2d}/{runs}: {status}  "
               f"costo={result['best_cost']:>4d}  "
               f"iters_óptimo={result['iterations_to_optimal']:>3d}  "
               f"conf_constructiva={result['construction_cost']:.2f}  "
-              f"tiempo={result['elapsed']:.4f}s")
+              f"tiempo={result['elapsed']:.4f}s") #Se imprimen los resultados de los GRASP.
 
-    # Promedios
+    #Obtención de promedios
     avg_success = sum(1 for r in results if r["success"]) / runs * 100
     avg_iters = sum(r["iterations_to_optimal"] for r in results) / runs
     avg_construction = sum(r["construction_cost"] for r in results) / runs
@@ -229,6 +231,7 @@ def print_table(averages, n_values, alpha, grasp_iterations, runs):
 
 def main():
 
+    #Todo lo relacionado con parser permite modificar parámetros desde línea de comandos, por parte del usuario
     parser = argparse.ArgumentParser(
         description="Benchmark estadístico para GRASP en el problema de las N-Reinas."
     )
